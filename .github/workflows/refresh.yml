@@ -1,0 +1,32 @@
+name: refresh
+on:
+  schedule:
+    - cron: "30 21 * * 1-5"   # ~16:30 ET 收盘后
+    - cron: "0 1 * * 2-6"     # ~20:00 ET 前日 结算/IV
+    - cron: "0 8 * * 1-5"     # ~04:00 ET 韩股收盘隔夜 tape
+  workflow_dispatch: {}
+  push:
+    paths:
+      - "state.json"
+      - "config.py"
+      - "refresh.py"
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python refresh.py
+      - name: commit
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add index.html status.json data_history.csv
+          git pull --rebase --autostash || true
+          git commit -m "refresh $(date -u +%F)" || echo "no changes"
+          git push || echo "push failed"
